@@ -1,12 +1,16 @@
 import mysql.connector
+from dotenv import load_dotenv
+import os
+
+load_dotenv()
 
 def get_db_connection():
-    """Establish connection to the MySQL server."""
+    """Establish connection to the MySQL server using environment variables."""
     return mysql.connector.connect(
-        host="localhost",
-        user="root",
-        password="your_password",
-        database="forensics_coc"
+        host=os.getenv("DB_HOST"),
+        user=os.getenv("DB_USER"),
+        password=os.getenv("DB_PASSWORD"),
+        database=os.getenv("DB_NAME")
     )
 
 def get_latest_hash(evidence_id):
@@ -227,3 +231,59 @@ def get_full_chain_of_custody(evidence_id):
     results = cursor.fetchall()
     conn.close()
     return results
+
+def get_dashboard_stats():
+    """Returns counts for the main UI dashboard."""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    stats = {}
+    
+    cursor.execute("SELECT COUNT(*) FROM cases")
+    stats['total_cases'] = cursor.fetchone()[0]
+    
+    cursor.execute("SELECT COUNT(*) FROM evidence")
+    stats['total_evidence'] = cursor.fetchone()[0]
+    
+    cursor.execute("SELECT COUNT(*) FROM lab_analysis WHERE status = 'Pending'")
+    stats['pending_labs'] = cursor.fetchone()[0]
+    
+    conn.close()
+    return stats
+
+def search_evidence(search_query):
+    """Allows searching evidence by description or ID."""
+    conn = get_db_connection()
+    cursor = conn.cursor(dictionary=True)
+    query = "SELECT * FROM evidence WHERE evidence_id LIKE %s OR description LIKE %s"
+    params = (f"%{search_query}%", f"%{search_query}%")
+    cursor.execute(query, params)
+    results = cursor.fetchall()
+    conn.close()
+    return results
+
+def get_cases_for_evidence(evidence_id):
+    """Retrieves all cases linked to a specific piece of evidence (Junction Query)."""
+    conn = get_db_connection()
+    cursor = conn.cursor(dictionary=True)
+    query = """
+        SELECT c.* FROM cases c
+        JOIN case_evidence_map m ON c.case_id = m.case_id
+        WHERE m.evidence_id = %s
+    """
+    cursor.execute(query, (evidence_id,))
+    results = cursor.fetchall()
+    conn.close()
+    return results
+
+def log_audit_result(evidence_id, result_message, status):
+    """Logs the results of a cryptographic integrity check."""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    try:
+        cursor.execute('''
+            INSERT INTO system_audit_logs (evidence_id, result_message, status, audit_time)
+            VALUES (%s, %s, %s, NOW())
+        ''', (evidence_id, result_message, status))
+        conn.commit()
+    finally:
+        conn.close()

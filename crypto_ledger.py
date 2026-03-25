@@ -1,6 +1,7 @@
 import hashlib
 import json
 import db_manager
+import datetime
 
 def generate_row_hash(payload_dict):
     """
@@ -95,3 +96,44 @@ def verify_digital_evidence(uploaded_file_bytes, stored_db_hash):
         return True, "Match: Digital evidence is intact and untampered."
     else:
         return False, "ALERT: File hash mismatch. This digital evidence has been altered!"
+
+def generate_row_hash(payload_dict):
+    """
+    Harden JSON Serialization: Ensures datetimes are 
+    consistently converted to strings before hashing.
+    """
+    hash_data = payload_dict.copy()
+    
+    if 'current_hash' in hash_data:
+        del hash_data['current_hash']
+        
+    # Convert any datetime objects to ISO format strings for consistency
+    for key, value in hash_data.items():
+        if isinstance(value, (datetime.datetime, datetime.date)):
+            hash_data[key] = value.isoformat()
+            
+    row_string = json.dumps(hash_data, sort_keys=True)
+    return hashlib.sha256(row_string.encode('utf-8')).hexdigest()
+
+def verify_entire_system_integrity():
+    """
+    Global System Audit: Fetches every piece of evidence 
+    and verifies its entire chain of custody.
+    """
+    evidence_list = db_manager.get_all_evidence()
+    system_status = True
+    report = []
+
+    for ev in evidence_list:
+        ev_id = ev['evidence_id']
+        is_valid, message = verify_evidence_ledger(ev_id)
+        
+        status_str = "Pass" if is_valid else "Fail"
+        db_manager.log_audit_result(ev_id, message, status_str)
+        
+        if not is_valid:
+            system_status = False
+        
+        report.append({"evidence_id": ev_id, "status": status_str, "message": message})
+        
+    return system_status, report

@@ -1,25 +1,29 @@
 import mysql.connector
+from dotenv import load_dotenv
 import os
 
+load_dotenv()
+
 def get_connection():
-    """Establish connection to the MySQL server."""
+    """Establish connection to the MySQL server using environment variables."""
     return mysql.connector.connect(
-        host="localhost",
-        user="root",
-        password="your_password",
-        database="forensics_coc"
+        host=os.getenv("DB_HOST"),
+        user=os.getenv("DB_USER"),
+        password=os.getenv("DB_PASSWORD"),
+        database=os.getenv("DB_NAME")
     )
 
 def initialize_database():
     print("Connecting to MySQL server...")
     
+    # Connect without a database initially to create it
     temp_conn = mysql.connector.connect(
-        host="localhost", 
-        user="root", 
-        password="your_password"
+        host=os.getenv("DB_HOST"), 
+        user=os.getenv("DB_USER"), 
+        password=os.getenv("DB_PASSWORD")
     )
     temp_cursor = temp_conn.cursor()
-    temp_cursor.execute("CREATE DATABASE IF NOT EXISTS forensics_coc")
+    temp_cursor.execute(f"CREATE DATABASE IF NOT EXISTS {os.getenv('DB_NAME')}")
     temp_conn.close()
 
     conn = get_connection()
@@ -143,6 +147,16 @@ def initialize_database():
         FOREIGN KEY (evidence_id) REFERENCES evidence(evidence_id),
         FOREIGN KEY (authorized_by_badge) REFERENCES personnel(badge_number),
         FOREIGN KEY (witnessed_by_badge) REFERENCES personnel(badge_number)
+    )
+    ''')
+
+    cursor.execute('''
+    CREATE TABLE IF NOT EXISTS system_audit_logs (
+        audit_id INT AUTO_INCREMENT PRIMARY KEY,
+        evidence_id VARCHAR(255),
+        result_message TEXT,
+        status VARCHAR(50), -- 'Pass' or 'Fail'
+        audit_time DATETIME
     )
     ''')
 
