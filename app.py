@@ -17,15 +17,33 @@ menu = st.sidebar.radio("Navigation", [
     "Audit Ledger"
 ])
 
-# --- MOCK HELPER FUNCTIONS ---
-# Note for the Team: You need to add these to db_manager.py to dynamically populate the dropdowns 
-def get_personnel_list():
-    # Example: return ["B-101 (Det. Jenkins)", "B-102 (Tech Davis)"]
-    return ["B-101", "B-102", "B-103"] 
+# --- DYNAMIC LOADER FUNCTIONS ---
+def load_personnel_dropdown():
+    """Fetches personnel from DB and formats them for Streamlit."""
+    try:
+        personnel_data = db_manager.get_all_personnel() 
+        # Format: "B-101 (last_name, first_name)"
+        return [f"{p['badge_number']} ({p['last_name']}, {p['first_name']})" for p in personnel_data]
+    except Exception as e:
+        st.error(f"Failed to load personnel: {e}")
+        return []
 
-def get_storage_locations():
-    # Example: return ["LOC-01 (Deep Freezer)", "LOC-02 (Locker A)"]
-    return ["LOC-01", "LOC-02", "LOC-03"]
+def load_locations_dropdown():
+    """Fetches locations from DB and formats them for Streamlit."""
+    try:
+        locations_data = db_manager.get_all_storage_locations() 
+        # Format: "LOC-01 (Facility Name)"
+        return [f"{loc['location_id']} ({loc['facility_name']})" for loc in locations_data]
+    except Exception as e:
+        st.error(f"Failed to load locations: {e}")
+        return []
+
+def extract_id(dropdown_string):
+    """Takes 'B-101 (Jenkins, John)' and returns just the ID 'B-101'"""
+    if dropdown_string:
+        return dropdown_string.split(" ")[0]
+    return None
+
 
 # --- PAGE 1: LOG NEW EVIDENCE ---
 if menu == "Log New Evidence":
@@ -43,46 +61,50 @@ if menu == "Log New Evidence":
             
         with col2:
             collection_location = st.text_input("Collection Location (GPS/Address)")
-            collected_by_badge = st.selectbox("Collected By (Badge Number)", get_personnel_list())
-            current_location_id = st.selectbox("Initial Storage Location", get_storage_locations())
+            # Using the dynamic loaders here
+            collected_by_selection = st.selectbox("Collected By (Badge Number)", load_personnel_dropdown())
+            storage_selection = st.selectbox("Initial Storage Location", load_locations_dropdown())
             
         submitted = st.form_submit_button("Log Evidence")
         
         if submitted:
-            if not evidence_id or not case_id:
-                st.error("Evidence ID and Case ID are required.")
+            if not evidence_id or not collected_by_selection:
+                st.error("Evidence ID and Collector are required.")
             else:
                 now = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+                
+                # Extract the pure Foreign Keys using our helper
+                badge_number = extract_id(collected_by_selection)
+                location_id = extract_id(storage_selection)
                 
                 # 1. Build the Evidence Payload
                 ev_payload = {
                     "evidence_id": evidence_id,
-                    "case_id": case_id,
+                    "case_id": case_id, # If you have a case_id field in DB, add it, otherwise ignore
                     "item_type": item_type,
                     "description": description,
                     "collection_location": collection_location,
-                    "collected_by_badge": collected_by_badge,
+                    "collected_by_badge": badge_number,
                     "collected_at": now,
-                    "current_location_id": current_location_id,
-                    "digital_hash": None # Handled later for digital evidence
+                    "current_location_id": location_id,
+                    "digital_hash": None 
                 }
                 
                 # 2. Build the Genesis Transfer Payload
                 transfer_payload = {
                     "evidence_id": evidence_id,
-                    "transferred_by_badge": "SYSTEM", # Genesis record
-                    "received_by_badge": collected_by_badge,
+                    "transferred_by_badge": "SYS", # Genesis record
+                    "received_by_badge": badge_number,
                     "reason": "Initial Intake",
                     "transfer_time": now,
                     "previous_hash": "GENESIS_HASH"
                 }
                 
                 try:
-                    # Execute DB Insert
-                    # Note: db_manager needs an insert_evidence function!
-                    # db_manager.insert_evidence(ev_payload) 
+                    # Log physical evidence
+                    db_manager.insert_evidence(ev_payload) 
                     
-                    # Trigger Application-Level Trigger [cite: 177, 185]
+                    # Trigger Application-Level Trigger
                     success = crypto_ledger.process_new_transfer(transfer_payload)
                     
                     if success:
@@ -98,8 +120,9 @@ elif menu == "Transfer Custody":
     
     with st.form("transfer_form"):
         evidence_id = st.text_input("Evidence ID")
-        transferred_by_badge = st.selectbox("Relinquished By (Badge Number)", get_personnel_list())
-        received_by_badge = st.selectbox("Received By (Badge Number)", get_personnel_list())
+        # Using the dynamic loaders
+        transferred_by_selection = st.selectbox("Relinquished By (Badge Number)", load_personnel_dropdown())
+        received_by_selection = st.selectbox("Received By (Badge Number)", load_personnel_dropdown())
         reason = st.text_input("Reason for Transfer")
         
         submitted = st.form_submit_button("Cryptographically Sign Transfer")
@@ -107,18 +130,19 @@ elif menu == "Transfer Custody":
         if submitted:
             now = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
             
-            # The payload expected by crypto_ledger.process_new_transfer [cite: 70, 71, 72]
+            # Extract IDs before sending to ledger
+            transferred_by_badge = extract_id(transferred_by_selection)
+            received_by_badge = extract_id(received_by_selection)
+            
             transfer_payload = {
                 "evidence_id": evidence_id,
                 "transferred_by_badge": transferred_by_badge,
                 "received_by_badge": received_by_badge,
                 "reason": reason,
                 "transfer_time": now
-                # previous_hash and current_hash are handled by process_new_transfer [cite: 71, 72]
             }
             
             try:
-                # Bind directly to the crypto_ledger 
                 success = crypto_ledger.process_new_transfer(transfer_payload)
                 if success:
                     st.success("✅ Transfer mathematically verified and committed to ledger.")
@@ -134,26 +158,27 @@ elif menu == "Audit Ledger":
     evidence_id = st.text_input("Enter Evidence ID to Audit:")
     
     if st.button("Verify Ledger Integrity"):
-        # Note: You will need a verify_chain() function in your crypto_ledger
-        # is_valid, message = crypto_ledger.verify_chain(evidence_id)
-        
-        # Mocking for the UI demonstration
+        # Mocking for now until you wire up verify_chain()
         is_valid = True
         message = "Ledger mathematically intact."
         
         if is_valid:
             st.success(f"✅ {message}")
             st.balloons()
-            
-            # Note: Integrate your get_full_chain_of_custody here [cite: 147]
-            # records = db_manager.get_full_chain_of_custody(evidence_id)
-            # if records:
-            #     df = pd.DataFrame(records)
-            #     st.dataframe(df)
         else:
             st.error(f"🚨 BREACH DETECTED: {message}")
             
-# --- DASHBOARD (Placeholder) ---
+# --- DASHBOARD ---
 elif menu == "Dashboard":
     st.title("Forensic Database Overview")
     st.info("Navigate using the sidebar to log evidence or execute transfers.")
+    
+    # Optional: If you want to show live stats right away!
+    try:
+        stats = db_manager.get_dashboard_stats()
+        col1, col2, col3 = st.columns(3)
+        col1.metric("Total Cases", stats.get('total_cases', 0))
+        col2.metric("Total Evidence Logged", stats.get('total_evidence', 0))
+        col3.metric("Pending Lab Requests", stats.get('pending_labs', 0))
+    except Exception as e:
+        pass # Silently pass if DB isn't seeded yet
