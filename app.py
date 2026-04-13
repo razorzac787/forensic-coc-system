@@ -8,7 +8,7 @@ import pandas as pd
 st.set_page_config(page_title="Forensic CoC System", layout="wide", page_icon="🥥")
 
 # --- SIDEBAR NAVIGATION ---
-st.sidebar.title("🥥 Project COCONUT")
+st.sidebar.title("Chain of Custody System")
 st.sidebar.markdown("### Forensic Ledger UI")
 menu = st.sidebar.radio("Navigation", [
     "Dashboard", 
