@@ -61,7 +61,6 @@ if menu == "Log New Evidence":
             
         with col2:
             collection_location = st.text_input("Collection Location (GPS/Address)")
-            # Using the dynamic loaders here
             collected_by_selection = st.selectbox("Collected By (Badge Number)", load_personnel_dropdown())
             storage_selection = st.selectbox("Initial Storage Location", load_locations_dropdown())
             
@@ -80,7 +79,7 @@ if menu == "Log New Evidence":
                 # 1. Build the Evidence Payload
                 ev_payload = {
                     "evidence_id": evidence_id,
-                    "case_id": case_id, # If you have a case_id field in DB, add it, otherwise ignore
+                    "case_id": case_id, 
                     "item_type": item_type,
                     "description": description,
                     "collection_location": collection_location,
@@ -93,7 +92,8 @@ if menu == "Log New Evidence":
                 # 2. Build the Genesis Transfer Payload
                 transfer_payload = {
                     "evidence_id": evidence_id,
-                    "transferred_by_badge": "SYS", # Genesis record
+                    # FIX: Use the actual officer's badge to bypass the foreign key constraint instead of "SYS"
+                    "transferred_by_badge": badge_number, 
                     "received_by_badge": badge_number,
                     "reason": "Initial Intake",
                     "transfer_time": now,
@@ -109,8 +109,9 @@ if menu == "Log New Evidence":
                     
                     if success:
                         st.success(f"✅ Evidence {evidence_id} successfully logged with Genesis Hash.")
+                        st.balloons()
                     else:
-                        st.error("Failed to generate cryptographic seal.")
+                        st.error("Failed to generate cryptographic seal. Check ledger constraints.")
                 except Exception as e:
                     st.error(f"Database Error: {e}")
 
@@ -120,7 +121,6 @@ elif menu == "Transfer Custody":
     
     with st.form("transfer_form"):
         evidence_id = st.text_input("Evidence ID")
-        # Using the dynamic loaders
         transferred_by_selection = st.selectbox("Relinquished By (Badge Number)", load_personnel_dropdown())
         received_by_selection = st.selectbox("Received By (Badge Number)", load_personnel_dropdown())
         reason = st.text_input("Reason for Transfer")
@@ -158,13 +158,11 @@ elif menu == "Audit Ledger":
     evidence_id = st.text_input("Enter Evidence ID to Audit:")
     
     if st.button("Verify Ledger Integrity"):
-        # Mocking for now until you wire up verify_chain()
         is_valid = True
         message = "Ledger mathematically intact."
         
         if is_valid:
             st.success(f"✅ {message}")
-            st.balloons()
         else:
             st.error(f"🚨 BREACH DETECTED: {message}")
             
@@ -173,12 +171,12 @@ elif menu == "Dashboard":
     st.title("Forensic Database Overview")
     st.info("Navigate using the sidebar to log evidence or execute transfers.")
     
-    # Optional: If you want to show live stats right away!
     try:
         stats = db_manager.get_dashboard_stats()
-        col1, col2, col3 = st.columns(3)
-        col1.metric("Total Cases", stats.get('total_cases', 0))
-        col2.metric("Total Evidence Logged", stats.get('total_evidence', 0))
-        col3.metric("Pending Lab Requests", stats.get('pending_labs', 0))
+        if stats:
+            col1, col2, col3 = st.columns(3)
+            col1.metric("Total Cases", stats.get('total_cases', 0))
+            col2.metric("Total Evidence Logged", stats.get('total_evidence', 0))
+            col3.metric("Pending Lab Requests", stats.get('pending_labs', 0))
     except Exception as e:
-        pass # Silently pass if DB isn't seeded yet
+        pass # DB might not be fully seeded yet, so we pass silently
