@@ -114,7 +114,7 @@ else:
                     success = crypto_ledger.process_new_transfer(transfer_payload)
                     if success:
                         st.success(f"✅ Evidence {evidence_id} successfully logged.")
-                        st.balloons()
+                        
                     else:
                         st.error("Failed to generate cryptographic seal.")
                 except Exception as e:
