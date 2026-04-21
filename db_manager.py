@@ -2,7 +2,6 @@ import os
 import mysql.connector
 from dotenv import load_dotenv
 
-
 load_dotenv()
 
 def get_db_connection():
@@ -288,3 +287,7 @@ def log_audit_result(evidence_id, result_message, status):
         conn.commit()
     finally:
         conn.close()
+
+def get_evidence_audit_trail(evidence_id):
+    """Acts as a bridge so app.py can successfully fetch the Audit Trail without crashing."""
+    return get_full_chain_of_custody(evidence_id)
