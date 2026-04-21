@@ -6,7 +6,7 @@ import pandas as pd
 import report_generator
 import os
 
-# --- PAGE CONFIGURATION ---
+
 st.set_page_config(page_title="Forensic CoC System", layout="wide", page_icon="🥥")
 
 # --- TASK 1: SESSION STATE MANAGEMENT ---
