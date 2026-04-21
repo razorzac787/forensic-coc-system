@@ -13,7 +13,7 @@ def upgrade_database():
     )
     cursor = conn.cursor()
 
-    # 1. Create the new enterprise tables
+  
     queries = [
         """
         CREATE TABLE IF NOT EXISTS cases (
