@@ -14,7 +14,7 @@ class CourtReportPDF(FPDF):
         self.set_font('Arial', 'I', 8)
         self.cell(0, 10, f'Page {self.page_no()}', 0, 0, 'C')
 
-def generate_pdf_report(evidence_id, audit_trail, output_filename="court_report.pdf"):
+def generate_pdf_report(evidence_id, audit_trail):
     """
     Takes the SQL audit trail and generates a professional PDF.
     """
@@ -34,19 +34,20 @@ def generate_pdf_report(evidence_id, audit_trail, output_filename="court_report.
     pdf.cell(30, 10, 'Relinquished', 1)
     pdf.cell(30, 10, 'Received', 1)
     pdf.cell(40, 10, 'Reason', 1)
-    pdf.cell(50, 10, 'Hash Signature (Truncated)', 1)
+    pdf.cell(50, 10, 'Hash Signature', 1)
     pdf.ln()
     
     # --- Table Body ---
     pdf.set_font('Arial', '', 9)
     for record in audit_trail:
-        # Convert dictionary keys to match your db_manager SQL query
-        time_str = str(record.get('Date & Time', ''))
-        relinq = str(record.get('Relinquished By', ''))
-        recv = str(record.get('Received By', ''))
-        reason = str(record.get('Reason/Action', ''))
-        # Truncate hash so it fits on the PDF page
-        full_hash = str(record.get('Cryptographic Signature', ''))
+     
+        time_str = str(record.get('transfer_time', ''))
+        relinq = str(record.get('transferred_by_name', ''))
+        recv = str(record.get('received_by_name', ''))
+        reason = str(record.get('reason', ''))
+        
+        # Truncate hash so it fits neatly in the PDF column
+        full_hash = str(record.get('current_hash', ''))
         short_hash = full_hash[:15] + "..." if len(full_hash) > 15 else full_hash
         
         pdf.cell(40, 10, time_str, 1)
@@ -56,5 +57,9 @@ def generate_pdf_report(evidence_id, audit_trail, output_filename="court_report.
         pdf.cell(50, 10, short_hash, 1)
         pdf.ln()
         
-    pdf.output(output_filename)
-    return output_filename
+  
+    pdf_data = pdf.output()
+    if isinstance(pdf_data, bytearray):
+        return bytes(pdf_data)  # Handles modern fpdf2 library
+    else:
+        return pdf.output(dest="S").encode("latin-1")  # Fallback for older fpdf
