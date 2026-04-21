@@ -28,33 +28,37 @@ def generate_pdf_report(evidence_id, audit_trail):
     pdf.cell(0, 10, f"Report Generated: {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}", 0, 1)
     pdf.ln(5)
     
-    # --- Table Header ---
+   # --- Table Header ---
     pdf.set_font('Arial', 'B', 10)
-    pdf.cell(40, 10, 'Date & Time', 1)
-    pdf.cell(30, 10, 'Relinquished', 1)
-    pdf.cell(30, 10, 'Received', 1)
-    pdf.cell(40, 10, 'Reason', 1)
-    pdf.cell(50, 10, 'Hash Signature', 1)
+    # Redistributed widths (Total = 190 to fit the page perfectly)
+    pdf.cell(35, 10, 'Date & Time', 1)
+    pdf.cell(25, 10, 'Relinquished', 1)
+    pdf.cell(25, 10, 'Received', 1)
+    pdf.cell(65, 10, 'Reason', 1)
+    pdf.cell(40, 10, 'Hash Signature', 1)
     pdf.ln()
     
     # --- Table Body ---
     pdf.set_font('Arial', '', 9)
     for record in audit_trail:
-     
         time_str = str(record.get('transfer_time', ''))
         relinq = str(record.get('transferred_by_name', ''))
         recv = str(record.get('received_by_name', ''))
+        
+     
         reason = str(record.get('reason', ''))
+        short_reason = reason[:38] + "..." if len(reason) > 38 else reason
         
         # Truncate hash so it fits neatly in the PDF column
         full_hash = str(record.get('current_hash', ''))
         short_hash = full_hash[:15] + "..." if len(full_hash) > 15 else full_hash
         
-        pdf.cell(40, 10, time_str, 1)
-        pdf.cell(30, 10, relinq, 1)
-        pdf.cell(30, 10, recv, 1)
-        pdf.cell(40, 10, reason, 1)
-        pdf.cell(50, 10, short_hash, 1)
+        # Apply the new widths here as well
+        pdf.cell(35, 10, time_str, 1)
+        pdf.cell(25, 10, relinq, 1)
+        pdf.cell(25, 10, recv, 1)
+        pdf.cell(65, 10, short_reason, 1)
+        pdf.cell(40, 10, short_hash, 1)
         pdf.ln()
         
   
