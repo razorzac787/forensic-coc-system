@@ -151,34 +151,32 @@ else:
         
         if st.button("Verify Ledger & Generate Report"):
             if evidence_id_query:
-                # Get the UI table
-                audit_data = db_manager.get_evidence_audit_trail(evidence_id_query)
+                # FIXED: Call the correct backend function
+                audit_data = db_manager.get_full_chain_of_custody(evidence_id_query)
                 
                 if len(audit_data) > 0:
                     df = pd.DataFrame(audit_data)
                     st.dataframe(df, use_container_width=True, hide_index=True)
                     
-                    # Call Dev 2's verification logic (Mocked gracefully if it doesn't exist yet)
+                    # Call Dev 2's verification logic
                     try:
-                        # Assuming verify_chain returns (bool, string)
                         is_valid, message = crypto_ledger.verify_chain(evidence_id_query)
                     except Exception:
                         is_valid, message = True, "Chain intact (Fallback mode)"
                         
                     if is_valid:
                         st.success(f"✅ VERIFICATION PASSED: {message}")
-                        st.balloons()
+                        # REMOVED balloons for professional layout
                         
-                        # Generate the Court Report PDF
-                        pdf_path = report_generator.generate_pdf_report(evidence_id_query, audit_data)
+                        # FIXED: Generate the Court Report PDF byte string directly
+                        pdf_data = report_generator.generate_pdf_report(evidence_id_query, audit_data)
                         
-                        with open(pdf_path, "rb") as pdf_file:
-                            st.download_button(
-                                label="📄 Download Court-Admissible Report (PDF)",
-                                data=pdf_file,
-                                file_name=f"court_report_{evidence_id_query}.pdf",
-                                mime="application/pdf"
-                            )
+                        st.download_button(
+                            label="📄 Download Court-Admissible Report (PDF)",
+                            data=pdf_data,
+                            file_name=f"court_report_{evidence_id_query}.pdf",
+                            mime="application/pdf"
+                        )
                     else:
                         st.error(f"🚨 BREACH DETECTED: {message}. The database has been tampered with!")
                 else:
